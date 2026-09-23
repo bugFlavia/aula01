@@ -1,0 +1,24 @@
+{
+  "name": "aula01",
+  "version": "1.0.0",
+  "description": "Sistema distribuído: servidor de sensores -> gateway -> serviço de média",
+  "scripts": {
+    "servico": "node servico/servico-media.ts",
+    "gateway": "node gateway/gateway.ts",
+    "sensores": "node sensores/servidor-sensores.ts",
+    "consulta": "node consulta.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "module",
+  "dependencies": {
+    "net": "^1.0.2",
+    "ts-node": "^10.9.2",
+    "typescript": "^7.0.2"
+  },
+  "devDependencies": {
+    "@types/node": "^26.4.1"
+  }
+}
