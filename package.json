@@ -3,10 +3,6 @@
   "version": "1.0.0",
   "description": "Sistema distribuído: servidor de sensores -> gateway -> serviço de média",
   "scripts": {
-    "servico": "node servico/servico-media.ts",
-    "gateway": "node gateway/gateway.ts",
-    "sensores": "node sensores/servidor-sensores.ts",
-    "consulta": "node consulta.ts",
     "typecheck": "tsc --noEmit"
   },
   "keywords": [],

@@ -1,65 +1,69 @@
 # Sistema distribuído de sensores
 
 ```
-┌──────────────────────┐  lote_leituras   ┌───────────┐  calcular_media   ┌─────────────────┐
-│ Servidor de Sensores │ ───────────────► │  Gateway  │ ────────────────► │ Serviço de Média│
-│ (4 sensores fictícios│ ◄─────────────── │ (guarda   │ ◄──────────────── │ (sem estado)    │
-│  máquina A)          │       ack        │  médias em│  resultado_media  │  máquina C      │
-└──────────────────────┘                  │  memória) │                   └─────────────────┘
-                                          │ máquina B │ ◄── consultar_medias (consulta.ts)
-                                          └───────────┘
+servidor-sensores ──"leituras"──► gateway ──"calcular"──► servico
+                                  gateway ◄──"medias"──── servico
+                                  (guarda as médias em memória)
 ```
 
-Protocolo: TCP puro (`node:net`), 1 mensagem JSON por linha. Todos os formatos de
-mensagem estão em [compartilhado/contratos.ts](compartilhado/contratos.ts).
+| Arquivo | O que é |
+|---|---|
+| `protocolo.ts` | As mensagens trocadas + funções de rede usadas por todos |
+| `sensor.ts` | Classe `Sensor` (sensor fictício) |
+| `servidor-sensores.ts` | Liga 4 sensores e envia as leituras ao gateway a cada 5s |
+| `gateway.ts` | Recebe leituras, pede a média ao serviço, guarda na memória |
+| `servico.ts` | Calcula a média de cada sensor |
 
-| Componente | Arquivo | Porta padrão | Variáveis de ambiente |
-|---|---|---|---|
-| Serviço de média | `servico/servico-media.ts` | 5050 | `PORTA`, `SERVICO_ID` |
-| Gateway | `gateway/gateway.ts` | 4000 | `PORTA`, `GATEWAY_ID`, `SERVICOS` (lista `host:porta,...`) |
-| Servidor de sensores | `sensores/servidor-sensores.ts` | — | `SERVIDOR_ID`, `GATEWAY` (`host:porta`), `INTERVALO_LEITURA_MS`, `INTERVALO_ENVIO_MS` |
-| Consulta | `consulta.ts` | — | `GATEWAY` |
+## Como rodar
 
-## Rodando local (3 terminais, na ordem)
+A configuração vai **no próprio comando**, depois do nome do arquivo:
 
 ```bash
-npm run servico
-npm run gateway
-npm run sensores
-# em um 4º terminal, para ver o que o gateway guardou:
-npm run consulta
+node servico.ts            [porta]                    # padrão: 5050
+node gateway.ts            [porta] [ip:porta-servico] # padrão: 4000 127.0.0.1:5050
+node servidor-sensores.ts  [nome]  [ip:porta-gateway] # padrão: sensores-1 127.0.0.1:4000
 ```
 
-## Rodando em várias máquinas
-
-Em cada máquina: copie o projeto, rode `npm install`, descubra o IP
-(`ipconfig getifaddr en0` no macOS, `hostname -I` no Linux, `ipconfig` no Windows).
-Exemplo com C = `192.168.0.30`, B = `192.168.0.20`:
+Tudo local, 3 terminais (nesta ordem):
 
 ```bash
-# Máquina C (serviço)
-npm run servico
-
-# Máquina B (gateway)
-SERVICOS=192.168.0.30:5050 npm run gateway
-
-# Máquina A (sensores)
-GATEWAY=192.168.0.20:4000 npm run sensores
-
-# De qualquer máquina
-GATEWAY=192.168.0.20:4000 npm run consulta
+node servico.ts
+node gateway.ts
+node servidor-sensores.ts
 ```
 
-Teste de conectividade antes: `nc -vz 192.168.0.20 4000`. Se falhar, libere a porta no firewall.
-No macOS a porta 5000 é ocupada pelo AirPlay — por isso o serviço usa 5050.
+## Adicionando mais
 
-## Escalando
+```bash
+# mais um servidor de sensores (nome diferente)
+node servidor-sensores.ts sensores-2
 
-- **Mais servidores de sensores:** rode outra instância com `SERVIDOR_ID` diferente.
-- **Mais gateways:** rode outra instância com `GATEWAY_ID` (e `PORTA`, se na mesma máquina)
-  diferentes; aponte cada servidor de sensores para o gateway desejado via `GATEWAY`.
-- **Mais serviços de média:** o serviço não guarda estado; suba outra cópia e liste todas em
-  `SERVICOS=ip1:5050,ip2:5050` — o gateway distribui em round-robin.
-- **Novo sensor:** adicione um item na lista `sensores` em `servidor-sensores.ts`.
-  Sensor real = nova classe que implementa a interface `Sensor` (`sensores/sensor.ts`).
-- **Trocar memória por banco:** implemente `RepositorioMedias` (`gateway/repositorio-medias.ts`).
+# mais um gateway (porta diferente) e um servidor de sensores ligado nele
+node gateway.ts 4001
+node servidor-sensores.ts sensores-3 127.0.0.1:4001
+
+# mais um serviço de média, usado por um gateway novo
+node servico.ts 5051
+node gateway.ts 4002 127.0.0.1:5051
+```
+
+Mais **sensores**: acrescente uma linha na lista `sensores` em `servidor-sensores.ts`:
+```ts
+new Sensor("ruido", "dB", 30, 90),
+```
+
+## Em várias máquinas
+
+Troque `127.0.0.1` pelo IP da máquina de destino (`ipconfig getifaddr en0` no Mac, `ipconfig` no Windows):
+
+```bash
+# Máquina C (192.168.0.30)
+node servico.ts
+# Máquina B (192.168.0.20)
+node gateway.ts 4000 192.168.0.30:5050
+# Máquina A
+node servidor-sensores.ts sensores-1 192.168.0.20:4000
+```
+
+Precisa de Node 22.18+ (roda `.ts` direto). Libere as portas no firewall.
+No macOS, evite a porta 5000 (é usada pelo AirPlay).
